@@ -15,8 +15,9 @@ app.use(express.json());
 app.use(cors());
 
 // Import all routes
-const products = require("./routes/productRoutes");
-app.use("/api/v1", products);
+app.use("/api/products", require("./routes/productRoutes"));
+app.use("/api/users", require("./routes/userRoutes"));
+app.use("/api/orders", require("./routes/orderRoutes"));
 
 // Middleware to handle errors
 app.use(errorMiddleware);

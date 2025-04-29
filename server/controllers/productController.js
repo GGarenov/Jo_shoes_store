@@ -2,8 +2,8 @@ const Product = require("../models/productModel");
 const ErrorHandler = require("../utils/errorHandler");
 const catchAsyncErrors = require("../middleware/catchAsyncErrors");
 
-// Create new product   =>   /api/v1/admin/product/new
-exports.createProduct = catchAsyncErrors(async (req, res, next) => {
+// Create new product   =>   /api/products/admin/product/new
+const createProduct = catchAsyncErrors(async (req, res, next) => {
   req.body.user = req.user.id;
 
   const product = await Product.create(req.body);
@@ -13,8 +13,8 @@ exports.createProduct = catchAsyncErrors(async (req, res, next) => {
   });
 });
 
-// Get all products with filters   =>   /api/v1/products
-exports.getProducts = catchAsyncErrors(async (req, res, next) => {
+// Get all products with filters   =>   /api/products
+const getProducts = catchAsyncErrors(async (req, res, next) => {
   const { gender, category, brand, minPrice, maxPrice, onSale, style } =
     req.query;
 
@@ -43,8 +43,8 @@ exports.getProducts = catchAsyncErrors(async (req, res, next) => {
   });
 });
 
-// Get single product details   =>   /api/v1/product/:id
-exports.getSingleProduct = catchAsyncErrors(async (req, res, next) => {
+// Get single product details   =>   /api/products/product/:id
+const getSingleProduct = catchAsyncErrors(async (req, res, next) => {
   const product = await Product.findById(req.params.id);
 
   if (!product) {
@@ -57,8 +57,8 @@ exports.getSingleProduct = catchAsyncErrors(async (req, res, next) => {
   });
 });
 
-// Update Product   =>   /api/v1/admin/product/:id
-exports.updateProduct = catchAsyncErrors(async (req, res, next) => {
+// Update Product   =>   /api/products/admin/product/:id
+const updateProduct = catchAsyncErrors(async (req, res, next) => {
   let product = await Product.findById(req.params.id);
 
   if (!product) {
@@ -84,8 +84,8 @@ exports.updateProduct = catchAsyncErrors(async (req, res, next) => {
   });
 });
 
-// Delete Product   =>   /api/v1/admin/product/:id
-exports.deleteProduct = catchAsyncErrors(async (req, res, next) => {
+// Delete Product   =>   /api/products/admin/product/:id
+const deleteProduct = catchAsyncErrors(async (req, res, next) => {
   const product = await Product.findById(req.params.id);
 
   if (!product) {
@@ -100,8 +100,8 @@ exports.deleteProduct = catchAsyncErrors(async (req, res, next) => {
   });
 });
 
-// Update product stock/size quantity   =>   /api/v1/admin/product/:id/stock
-exports.updateStock = catchAsyncErrors(async (req, res, next) => {
+// Update product stock/size quantity   =>   /api/products/admin/product/:id/stock
+const updateStock = catchAsyncErrors(async (req, res, next) => {
   const product = await Product.findById(req.params.id);
 
   if (!product) {
@@ -129,8 +129,8 @@ exports.updateStock = catchAsyncErrors(async (req, res, next) => {
   });
 });
 
-// Toggle sale status   =>   /api/v1/admin/product/:id/toggle-sale
-exports.toggleSale = catchAsyncErrors(async (req, res, next) => {
+// Toggle sale status   =>   /api/products/admin/product/:id/toggle-sale
+const toggleSale = catchAsyncErrors(async (req, res, next) => {
   const product = await Product.findById(req.params.id);
 
   if (!product) {
@@ -162,3 +162,14 @@ exports.toggleSale = catchAsyncErrors(async (req, res, next) => {
     product,
   });
 });
+
+// Group all exports at the end of the file
+module.exports = {
+  createProduct,
+  getProducts,
+  getSingleProduct,
+  updateProduct,
+  deleteProduct,
+  updateStock,
+  toggleSale,
+};
