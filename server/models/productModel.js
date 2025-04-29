@@ -114,6 +114,10 @@ const productSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  image: {
+    type: String,
+    required: [true, "Please provide a product image"],
+  },
 });
 
 // Calculated field for total stock across all sizes
