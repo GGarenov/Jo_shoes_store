@@ -1,39 +1,53 @@
 const express = require("express");
 const router = express.Router();
-
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const User = require("../models/userModel");
+const { protect, admin } = require("../middleware/authMiddleware");
 const {
   registerUser,
-  loginUser,
-  logout,
+  authUser,
   getUserProfile,
-  updatePassword,
-  updateProfile,
-  allUsers,
-  getUserDetails,
-  updateUser,
+  updateUserProfile,
   deleteUser,
 } = require("../controllers/userController");
 
-const { isAuthenticatedUser, authorizeRoles } = require("../middleware/auth");
+// @desc    Register a new user
+// @route   POST /api/users
+// @access  Public
+router.post("/", registerUser);
 
-// Public routes (removing /api/v1 since it's handled in server.js)
-router.route("/register").post(registerUser);
-router.route("/login").post(loginUser);
-router.route("/logout").get(logout);
+// @desc    Auth user & get token
+// @route   POST /api/users/login
+// @access  Public
+router.post("/login", authUser);
 
-// Protected routes
-router.route("/me").get(isAuthenticatedUser, getUserProfile);
-router.route("/password/update").put(isAuthenticatedUser, updatePassword);
-router.route("/me/update").put(isAuthenticatedUser, updateProfile);
+// @desc    Get user profile
+// @route   GET /api/users/profile
+// @access  Private
+router.get("/profile", protect, getUserProfile);
 
-// Admin routes
-router
-  .route("/admin/users")
-  .get(isAuthenticatedUser, authorizeRoles("admin"), allUsers);
-router
-  .route("/admin/user/:id")
-  .get(isAuthenticatedUser, authorizeRoles("admin"), getUserDetails)
-  .put(isAuthenticatedUser, authorizeRoles("admin"), updateUser)
-  .delete(isAuthenticatedUser, authorizeRoles("admin"), deleteUser);
+// @desc    Update user profile
+// @route   PUT /api/users/profile
+// @access  Private
+router.put("/profile", protect, updateUserProfile);
+
+// @desc    Get all users (Admin only)
+// @route   GET /api/users
+// @access  Private/Admin
+console.log("User Routes Loaded");
+router.get("/", protect, admin, async (req, res) => {
+  try {
+    const users = await User.find({});
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// @desc    Delete user (admin only)
+// @route   DELETE /api/users/:id
+// @access  Private/Admin
+router.delete("/:id", protect, admin, deleteUser);
 
 module.exports = router;

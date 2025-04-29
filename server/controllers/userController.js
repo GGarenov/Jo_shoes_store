@@ -1,189 +1,146 @@
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 const User = require("../models/userModel");
-const ErrorHandler = require("../utils/errorHandler");
-const catchAsyncErrors = require("../middleware/catchAsyncErrors");
 
-// Register a user => /api/users/register
-const registerUser = catchAsyncErrors(async (req, res, next) => {
-  const { name, email, password } = req.body;
+// Register a new user
+const registerUser = async (req, res) => {
+  const { name, email, password, userName } = req.body;
 
-  const user = await User.create({
-    name,
-    email,
-    password,
-  });
+  try {
+    const userExist = await User.findOne({ email });
 
-  const token = user.getJwtToken();
+    if (userExist) {
+      return res.status(400).json({ message: "User already exists" });
+    }
 
-  res.status(201).json({
-    success: true,
-    token,
-  });
-});
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
-// Login User => /api/users/login
-const loginUser = catchAsyncErrors(async (req, res, next) => {
+    const user = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+      userName,
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "User registration failed" });
+    }
+
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "30d",
+    });
+
+    res.status(201).json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      userName: user.userName,
+      token,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Auth user & get token
+const authUser = async (req, res) => {
   const { email, password } = req.body;
 
-  // Checks if email and password is entered by user
-  if (!email || !password) {
-    return next(new ErrorHandler("Please enter email & password", 400));
+  try {
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    const matchPassword = await bcrypt.compare(password, user.password);
+
+    if (!matchPassword) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "30d",
+    });
+
+    res.json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      userName: user.userName,
+      isAdmin: user.isAdmin,
+      token,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
   }
+  console.log("Logged in user:", user);
+};
 
-  // Finding user in database
-  const user = await User.findOne({ email }).select("+password");
+// Get user profile
+const getUserProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id); // Changed from req.user.id
 
-  if (!user) {
-    return next(new ErrorHandler("Invalid Email or Password", 401));
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      userName: user.userName,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
   }
+};
 
-  // Check if password is correct
-  const isPasswordMatched = await user.comparePassword(password);
+// Update user profile
+const updateUserProfile = async (req, res) => {
+  const { name, email, password, userName } = req.body;
 
-  if (!isPasswordMatched) {
-    return next(new ErrorHandler("Invalid Email or Password", 401));
+  try {
+    const user = await User.findById(req.user._id); // Changed from req.user.id
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Rest of the function remains the same
+    // ...
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
   }
+};
+// Delete a user (admin only)
+const deleteUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
 
-  const token = user.getJwtToken();
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
-  res.status(200).json({
-    success: true,
-    token,
-  });
-});
+    await User.deleteOne({ _id: req.params.id }); // Changed from user.remove()
 
-// Logout user => /api/users/logout
-const logout = catchAsyncErrors(async (req, res, next) => {
-  res.cookie("token", null, {
-    expires: new Date(Date.now()),
-    httpOnly: true,
-  });
-
-  res.status(200).json({
-    success: true,
-    message: "Logged out",
-  });
-});
-
-// Get currently logged in user details => /api/users/me
-const getUserProfile = catchAsyncErrors(async (req, res, next) => {
-  const user = await User.findById(req.user.id);
-
-  res.status(200).json({
-    success: true,
-    user,
-  });
-});
-
-// Update / Change password => /api/users/password/update
-const updatePassword = catchAsyncErrors(async (req, res, next) => {
-  const user = await User.findById(req.user.id).select("+password");
-
-  // Check previous user password
-  const isMatched = await user.comparePassword(req.body.oldPassword);
-  if (!isMatched) {
-    return next(new ErrorHandler("Old password is incorrect", 400));
+    res.json({ message: "User removed" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
   }
+};
 
-  user.password = req.body.password;
-  await user.save();
-
-  const token = user.getJwtToken();
-
-  res.status(200).json({
-    success: true,
-    token,
-  });
-});
-
-// Update user profile => /api/users/me/update
-const updateProfile = catchAsyncErrors(async (req, res, next) => {
-  const newUserData = {
-    name: req.body.name,
-    email: req.body.email,
-  };
-
-  const user = await User.findByIdAndUpdate(req.user.id, newUserData, {
-    new: true,
-    runValidators: true,
-    useFindAndModify: false,
-  });
-
-  res.status(200).json({
-    success: true,
-    user,
-  });
-});
-
-// Get all users => /api/users/admin/users
-const allUsers = catchAsyncErrors(async (req, res, next) => {
-  const users = await User.find();
-
-  res.status(200).json({
-    success: true,
-    users,
-  });
-});
-
-// Get user details => /api/users/admin/user/:id
-const getUserDetails = catchAsyncErrors(async (req, res, next) => {
-  const user = await User.findById(req.params.id);
-
-  if (!user) {
-    return next(new ErrorHandler(`User not found with id: ${req.params.id}`));
-  }
-
-  res.status(200).json({
-    success: true,
-    user,
-  });
-});
-
-// Update user profile (admin) => /api/users/admin/user/:id
-const updateUser = catchAsyncErrors(async (req, res, next) => {
-  const newUserData = {
-    name: req.body.name,
-    email: req.body.email,
-    role: req.body.role,
-  };
-
-  const user = await User.findByIdAndUpdate(req.params.id, newUserData, {
-    new: true,
-    runValidators: true,
-    useFindAndModify: false,
-  });
-
-  res.status(200).json({
-    success: true,
-    user,
-  });
-});
-
-// Delete user => /api/users/admin/user/:id
-const deleteUser = catchAsyncErrors(async (req, res, next) => {
-  const user = await User.findById(req.params.id);
-
-  if (!user) {
-    return next(new ErrorHandler(`User not found with id: ${req.params.id}`));
-  }
-
-  await user.remove();
-
-  res.status(200).json({
-    success: true,
-    message: "User deleted successfully",
-  });
-});
-
-// Group all exports at the end of the file
 module.exports = {
   registerUser,
-  loginUser,
-  logout,
+  authUser,
   getUserProfile,
-  updatePassword,
-  updateProfile,
-  allUsers,
-  getUserDetails,
-  updateUser,
+  updateUserProfile,
   deleteUser,
 };

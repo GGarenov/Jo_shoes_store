@@ -1,24 +1,37 @@
 const express = require("express");
 const router = express.Router();
-
+const { protect, admin } = require("../middleware/authMiddleware");
 const {
   getProducts,
+  getProductById,
   createProduct,
-  getSingleProduct,
   updateProduct,
   deleteProduct,
-  updateStock,
-  toggleSale,
 } = require("../controllers/productController");
 
-// Public Routes
-router.route("/products").get(getProducts);
-router.route("/product/:id").get(getSingleProduct);
+// @desc    Fetch all products
+// @route   GET /api/products
+// @access  Public
+router.get("/", getProducts);
 
-// Admin Routes
-router.route("/admin/product/new").post(createProduct);
-router.route("/admin/product/:id").put(updateProduct).delete(deleteProduct);
-router.route("/admin/product/:id/stock").put(updateStock);
-router.route("/admin/product/:id/toggle-sale").put(toggleSale);
+// @desc    Fetch single product
+// @route   GET /api/products/:id
+// @access  Public
+router.get("/:id", getProductById);
+
+// @desc    Create a new product
+// @route   POST /api/products
+// @access  Private/Admin
+router.post("/", protect, admin, createProduct);
+
+// @desc    Update an existing product
+// @route   PUT /api/products/:id
+// @access  Private/Admin
+router.put("/:id", protect, admin, updateProduct);
+
+// @desc    Delete a product
+// @route   DELETE /api/products/:id
+// @access  Private/Admin
+router.delete("/:id", protect, admin, deleteProduct);
 
 module.exports = router;

@@ -76,12 +76,6 @@ const productSchema = new mongoose.Schema({
     type: String,
     required: [true, "Please enter shoe brand"],
   },
-  stock: {
-    type: Number,
-    required: [true, "Please enter product stock"],
-    maxLength: [5, "Product stock cannot exceed 5 characters"],
-    default: 0,
-  },
   numOfReviews: {
     type: Number,
     default: 0,
@@ -125,12 +119,6 @@ const productSchema = new mongoose.Schema({
 // Calculated field for total stock across all sizes
 productSchema.virtual("totalStock").get(function () {
   return this.sizes.reduce((total, size) => total + size.quantity, 0);
-});
-
-// Update stock field before saving
-productSchema.pre("save", function (next) {
-  this.stock = this.sizes.reduce((total, size) => total + size.quantity, 0);
-  next();
 });
 
 module.exports = mongoose.model("Product", productSchema);

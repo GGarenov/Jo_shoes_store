@@ -1,175 +1,145 @@
+const asyncHandler = require("express-async-handler");
 const Product = require("../models/productModel");
-const ErrorHandler = require("../utils/errorHandler");
-const catchAsyncErrors = require("../middleware/catchAsyncErrors");
 
-// Create new product   =>   /api/products/admin/product/new
-const createProduct = catchAsyncErrors(async (req, res, next) => {
-  req.body.user = req.user.id;
-
-  const product = await Product.create(req.body);
-  res.status(201).json({
-    success: true,
-    product,
-  });
+// @desc    Fetch all products
+// @route   GET /api/products
+// @access  Public
+const getProducts = asyncHandler(async (req, res) => {
+  const products = await Product.find({});
+  res.json(products);
 });
 
-// Get all products with filters   =>   /api/products
-const getProducts = catchAsyncErrors(async (req, res, next) => {
-  const { gender, category, brand, minPrice, maxPrice, onSale, style } =
-    req.query;
-
-  // Build query
-  const query = {};
-
-  if (gender) query.gender = gender;
-  if (category) query.category = category;
-  if (brand) query.brand = brand;
-  if (style) query["attributes.style"] = style;
-  if (onSale === "true") query.onSale = true;
-
-  // Price filter
-  if (minPrice || maxPrice) {
-    query.price = {};
-    if (minPrice) query.price.$gte = Number(minPrice);
-    if (maxPrice) query.price.$lte = Number(maxPrice);
-  }
-
-  const products = await Product.find(query);
-
-  res.status(200).json({
-    success: true,
-    count: products.length,
-    products,
-  });
-});
-
-// Get single product details   =>   /api/products/product/:id
-const getSingleProduct = catchAsyncErrors(async (req, res, next) => {
+// @desc    Fetch single product
+// @route   GET /api/products/:id
+// @access  Public
+const getProductById = asyncHandler(async (req, res) => {
   const product = await Product.findById(req.params.id);
 
-  if (!product) {
-    return next(new ErrorHandler("Product not found", 404));
-  }
-
-  res.status(200).json({
-    success: true,
-    product,
-  });
-});
-
-// Update Product   =>   /api/products/admin/product/:id
-const updateProduct = catchAsyncErrors(async (req, res, next) => {
-  let product = await Product.findById(req.params.id);
-
-  if (!product) {
-    return next(new ErrorHandler("Product not found", 404));
-  }
-
-  // Validate sale price if product is on sale
-  if (req.body.onSale && req.body.salePrice >= product.price) {
-    return next(
-      new ErrorHandler("Sale price must be less than regular price", 400)
-    );
-  }
-
-  product = await Product.findByIdAndUpdate(req.params.id, req.body, {
-    new: true,
-    runValidators: true,
-    useFindAndModify: false,
-  });
-
-  res.status(200).json({
-    success: true,
-    product,
-  });
-});
-
-// Delete Product   =>   /api/products/admin/product/:id
-const deleteProduct = catchAsyncErrors(async (req, res, next) => {
-  const product = await Product.findById(req.params.id);
-
-  if (!product) {
-    return next(new ErrorHandler("Product not found", 404));
-  }
-
-  await product.deleteOne();
-
-  res.status(200).json({
-    success: true,
-    message: "Product is deleted.",
-  });
-});
-
-// Update product stock/size quantity   =>   /api/products/admin/product/:id/stock
-const updateStock = catchAsyncErrors(async (req, res, next) => {
-  const product = await Product.findById(req.params.id);
-
-  if (!product) {
-    return next(new ErrorHandler("Product not found", 404));
-  }
-
-  const { sizeUpdates } = req.body;
-
-  if (!sizeUpdates || !Array.isArray(sizeUpdates)) {
-    return next(new ErrorHandler("Invalid stock update data", 400));
-  }
-
-  sizeUpdates.forEach((update) => {
-    const sizeItem = product.sizes.find((s) => s.size === update.size);
-    if (sizeItem) {
-      sizeItem.quantity = update.quantity;
-    }
-  });
-
-  await product.save();
-
-  res.status(200).json({
-    success: true,
-    product,
-  });
-});
-
-// Toggle sale status   =>   /api/products/admin/product/:id/toggle-sale
-const toggleSale = catchAsyncErrors(async (req, res, next) => {
-  const product = await Product.findById(req.params.id);
-
-  if (!product) {
-    return next(new ErrorHandler("Product not found", 404));
-  }
-
-  const { onSale, salePrice } = req.body;
-
-  if (onSale && (!salePrice || salePrice >= product.price)) {
-    return next(
-      new ErrorHandler(
-        "Valid sale price less than regular price is required",
-        400
-      )
-    );
-  }
-
-  product.onSale = onSale;
-  if (onSale) {
-    product.salePrice = salePrice;
+  if (product) {
+    res.json(product);
   } else {
-    product.salePrice = undefined;
+    res.status(404);
+    throw new Error("Product not found");
   }
-
-  await product.save();
-
-  res.status(200).json({
-    success: true,
-    product,
-  });
 });
 
-// Group all exports at the end of the file
+const createProduct = asyncHandler(async (req, res) => {
+  const {
+    name,
+    image,
+    brand,
+    category,
+    description,
+    price,
+    countInStock,
+    frameType,
+    lensType,
+    uvProtection,
+    featured,
+  } = req.body;
+
+  console.log("Request body:", req.body);
+  console.log("Admin user ID:", req.user._id);
+
+  const productExists = await Product.findOne({ name });
+
+  if (productExists) {
+    res.status(400);
+    throw new Error("Product already exists");
+  }
+
+  const product = new Product({
+    user: req.user._id, // Admin's ID
+    name,
+    image,
+    brand,
+    category,
+    description,
+    price,
+    countInStock,
+    frameType: frameType || "",
+    lensType: lensType || "",
+    uvProtection: uvProtection || false,
+    featured: featured || false,
+    attributes: {
+      color: req.body.attributes?.color,
+      material: req.body.attributes?.material,
+    },
+    gender: req.body.gender,
+  });
+
+  try {
+    const createdProduct = await product.save();
+    res.status(201).json(createdProduct);
+  } catch (error) {
+    console.error("Error saving product:", error);
+    res
+      .status(500)
+      .json({ message: "Error creating product", error: error.message });
+  }
+});
+
+// @desc    Update an existing product
+// @route   PUT /api/products/:id
+// @access  Private/Admin
+const updateProduct = asyncHandler(async (req, res) => {
+  const {
+    name,
+    image,
+    brand,
+    category,
+    description,
+    price,
+    countInStock,
+    frameType,
+    lensType,
+    uvProtection,
+    featured,
+  } = req.body;
+
+  const product = await Product.findById(req.params.id);
+
+  if (product) {
+    product.name = name || product.name;
+    product.image = image || product.image;
+    product.brand = brand || product.brand;
+    product.category = category || product.category;
+    product.description = description || product.description;
+    product.price = price || product.price;
+    product.countInStock = countInStock || product.countInStock;
+
+    // Only update these if they are explicitly provided
+    if (frameType !== undefined) product.frameType = frameType;
+    if (lensType !== undefined) product.lensType = lensType;
+    if (uvProtection !== undefined) product.uvProtection = uvProtection;
+    if (featured !== undefined) product.featured = featured;
+
+    console.log("Updated product data:", product);
+
+    const updatedProduct = await product.save();
+    res.json(updatedProduct);
+  } else {
+    res.status(404);
+    throw new Error("Product not found");
+  }
+});
+
+const deleteProduct = asyncHandler(async (req, res) => {
+  const product = await Product.findById(req.params.id);
+
+  if (product) {
+    await Product.deleteOne({ _id: req.params.id });
+    res.json({ message: "Product removed" });
+  } else {
+    res.status(404);
+    throw new Error("Product not found");
+  }
+});
+
 module.exports = {
-  createProduct,
   getProducts,
-  getSingleProduct,
+  getProductById,
+  createProduct,
   updateProduct,
   deleteProduct,
-  updateStock,
-  toggleSale,
 };
