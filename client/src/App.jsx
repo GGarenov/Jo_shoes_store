@@ -1,35 +1,77 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import React from "react";
+import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+
+import Header from "./components/layout/Header";
+import Footer from "./components/layout/Footer";
+
+import HomePage from "./pages/HomePage";
+import ProductPage from "./pages/ProductPage";
+import CartPage from "./pages/CartPage";
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
+
+// Admin
+import AdminLayout from "./components/layout/AdminLayout";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import UserListPage from "./pages/admin/UserListPage";
+import ProductListPage from "./pages/admin/ProductListPage";
+import OrderListPage from "./pages/admin/OrderListPage";
+import CreateProductPage from "./pages/admin/CreateProductPage";
+
+// PrivateRoute component
+import PrivateRoute from "./components/PrivateRoute";
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <Router>
+      <div className="flex flex-col min-h-screen">
+        {/* Main layout */}
+        <Header />
+        <main className="container mx-auto px-4 py-8 flex-grow">
+          <Routes>
+            {/* Public routes */}
+            <Route path="/" element={<HomePage />} />
+            <Route path="/product/:id" element={<ProductPage />} />
+            <Route path="/cart" element={<CartPage />} />
+            <Route path="/cart/:id" element={<CartPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+
+            {/* Admin routes with PrivateRoute */}
+            <Route
+              path="/admin"
+              element={<PrivateRoute element={<AdminLayout />} />}
+            >
+              <Route
+                path="dashboard"
+                element={<PrivateRoute element={<AdminDashboard />} />}
+              />
+              <Route
+                path="users"
+                element={<PrivateRoute element={<UserListPage />} />}
+              />
+              <Route
+                path="products"
+                element={<PrivateRoute element={<ProductListPage />} />}
+              />
+              <Route
+                path="orders"
+                element={<PrivateRoute element={<OrderListPage />} />}
+              />
+              <Route
+                path="product/create"
+                element={<PrivateRoute element={<CreateProductPage />} />}
+              />
+            </Route>
+          </Routes>
+        </main>
+        <Footer />
+        <ToastContainer />
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    </Router>
+  );
 }
 
-export default App
+export default App;
