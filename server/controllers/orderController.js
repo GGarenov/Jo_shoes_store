@@ -1,156 +1,139 @@
+const asyncHandler = require("express-async-handler");
 const Order = require("../models/orderModel");
-const Product = require("../models/productModel");
-const ErrorHandler = require("../utils/errorHandler");
-const catchAsyncErrors = require("../middleware/catchAsyncErrors");
 
-// Create a new order => /api/orders/new
-const newOrder = catchAsyncErrors(async (req, res, next) => {
+// @desc    Create new order
+// @route   POST /api/orders
+// @access  Private
+const createOrder = asyncHandler(async (req, res) => {
   const {
-    shippingInfo,
     orderItems,
-    paymentInfo,
-    itemsPrice,
+    shippingAddress,
+    paymentMethod,
+    taxPrice,
     shippingPrice,
     totalPrice,
   } = req.body;
 
-  const order = await Order.create({
-    shippingInfo,
-    orderItems,
-    paymentInfo,
-    itemsPrice,
-    shippingPrice,
-    totalPrice,
-    paidAt: Date.now(),
-    user: req.user._id,
-  });
-
-  // Update product stock
-  for (const item of orderItems) {
-    const product = await Product.findById(item.product);
-    if (!product) {
-      return next(new ErrorHandler("Product not found", 404));
-    }
-
-    // Find the size and update its quantity
-    const sizeItem = product.sizes.find((s) => s.size === item.size);
-    if (!sizeItem || sizeItem.quantity < item.quantity) {
-      return next(
-        new ErrorHandler(`Insufficient stock for size ${item.size}`, 400)
-      );
-    }
-    sizeItem.quantity -= item.quantity;
-    await product.save();
+  if (orderItems && orderItems.length === 0) {
+    res.status(400);
+    throw new Error("No order items");
   }
 
-  res.status(201).json({
-    success: true,
-    order,
+  // Make sure req.user exists before accessing it
+  if (!req.user) {
+    res.status(401);
+    throw new Error("User not authorized");
+  }
+
+  const order = new Order({
+    orderItems,
+    user: req.user._id,
+    shippingAddress,
+    paymentMethod,
+    taxPrice,
+    shippingPrice,
+    totalPrice,
   });
+
+  const createdOrder = await order.save();
+
+  res.status(201).json(createdOrder);
 });
 
-// Get single order => /api/orders/:id
-const getSingleOrder = catchAsyncErrors(async (req, res, next) => {
+// @desc    Get order by ID
+// @route   GET /api/orders/:id
+// @access  Private
+const getOrderById = asyncHandler(async (req, res) => {
   const order = await Order.findById(req.params.id).populate(
     "user",
     "name email"
   );
 
-  if (!order) {
-    return next(new ErrorHandler("Order not found", 404));
+  if (order) {
+    // Only the owner of the order or an admin can see it
+    if (
+      order.user._id.toString() === req.user._id.toString() ||
+      req.user.isAdmin
+    ) {
+      res.json(order);
+    } else {
+      res.status(401);
+      throw new Error("Not authorized to view this order");
+    }
+  } else {
+    res.status(404);
+    throw new Error("Order not found");
   }
-
-  // Check if the order belongs to the logged-in user or if the user is admin
-  if (
-    order.user._id.toString() !== req.user._id.toString() &&
-    req.user.role !== "admin"
-  ) {
-    return next(
-      new ErrorHandler("You are not authorized to view this order", 403)
-    );
-  }
-
-  res.status(200).json({
-    success: true,
-    order,
-  });
 });
 
-// Get logged in user orders => /api/orders/me
-const myOrders = catchAsyncErrors(async (req, res, next) => {
+// @desc    Update order to paid
+// @route   PUT /api/orders/:id/pay
+// @access  Private
+const updateOrderToPaid = asyncHandler(async (req, res) => {
+  const order = await Order.findById(req.params.id);
+
+  if (order) {
+    order.isPaid = true;
+    order.paidAt = Date.now();
+    order.paymentResult = {
+      id: req.body.id,
+      status: req.body.status,
+      update_time: req.body.update_time,
+      email_address: req.body.email_address,
+    };
+
+    const updatedOrder = await order.save();
+
+    res.json(updatedOrder);
+  } else {
+    res.status(404);
+    throw new Error("Order not found");
+  }
+});
+
+// @desc    Update order to delivered
+// @route   PUT /api/orders/:id/deliver
+// @access  Private/Admin
+// @desc    Update order to delivered
+// @route   PUT /api/orders/:id/deliver
+// @access  Private/Admin
+const updateOrderToDelivered = asyncHandler(async (req, res) => {
+  const order = await Order.findById(req.params.id);
+
+  if (!order) {
+    res.status(404);
+    throw new Error("Order not found");
+  }
+
+  // Set the order to delivered
+  order.isDelivered = true;
+  order.deliveredAt = Date.now();
+
+  const updatedOrder = await order.save();
+  res.json(updatedOrder);
+});
+
+// @desc    Get logged in user orders
+// @route   GET /api/orders/myorders
+// @access  Private
+const getMyOrders = asyncHandler(async (req, res) => {
   const orders = await Order.find({ user: req.user._id });
-
-  res.status(200).json({
-    success: true,
-    orders,
-  });
+  res.json(orders);
 });
 
-// Admin: Get all orders => /api/orders/admin/all
-const allOrders = catchAsyncErrors(async (req, res, next) => {
-  const orders = await Order.find().populate("user", "name email");
-
-  let totalAmount = 0;
-  orders.forEach((order) => {
-    totalAmount += order.totalPrice;
-  });
-
-  res.status(200).json({
-    success: true,
-    totalAmount,
-    orders,
-  });
-});
-
-// Admin: Update order status => /api/orders/admin/:id
-const updateOrder = catchAsyncErrors(async (req, res, next) => {
-  const order = await Order.findById(req.params.id);
-
-  if (!order) {
-    return next(new ErrorHandler("Order not found", 404));
-  }
-
-  if (order.orderStatus === "Delivered") {
-    return next(new ErrorHandler("You have already delivered this order", 400));
-  }
-
-  // Update the order status
-  order.orderStatus = req.body.orderStatus;
-
-  // If order is delivered, update deliveredAt
-  if (req.body.orderStatus === "Delivered") {
-    order.deliveredAt = Date.now();
-  }
-
-  await order.save();
-
-  res.status(200).json({
-    success: true,
-    order,
-  });
-});
-
-// Admin: Delete order => /api/orders/admin/:id
-const deleteOrder = catchAsyncErrors(async (req, res, next) => {
-  const order = await Order.findById(req.params.id);
-
-  if (!order) {
-    return next(new ErrorHandler("Order not found", 404));
-  }
-
-  await order.deleteOne();
-
-  res.status(200).json({
-    success: true,
-    message: "Order deleted successfully",
-  });
+// @desc    Get all orders
+// @route   GET /api/orders
+// @access  Private/Admin
+const getOrders = asyncHandler(async (req, res) => {
+  const orders = await Order.find({}).populate("user", "id name");
+  res.json(orders);
 });
 
 module.exports = {
-  newOrder,
-  getSingleOrder,
-  myOrders,
-  allOrders,
-  updateOrder,
-  deleteOrder,
+  createOrder,
+  getOrderById,
+  updateOrderToPaid,
+  updateOrderToDelivered,
+  getMyOrders,
+  getOrders,
 };
