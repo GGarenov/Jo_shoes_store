@@ -6,7 +6,7 @@ const API_URL = "http://localhost:5000";
 
 export const fetchProducts = createAsyncThunk(
   "products/fetchProducts",
-  async (_, { getState, rejectWithValue }) => {
+  async (_, { rejectWithValue }) => {
     try {
       const { data } = await axios.get(`${API_URL}/api/products`);
       return data;
@@ -20,7 +20,7 @@ export const fetchProducts = createAsyncThunk(
 
 export const fetchProductDetails = createAsyncThunk(
   "products/fetchProductDetails",
-  async (id, { getState, rejectWithValue }) => {
+  async (id, { rejectWithValue }) => {
     try {
       const { data } = await axios.get(`${API_URL}/api/products/${id}`);
       return data;
@@ -43,13 +43,13 @@ export const deleteProduct = createAsyncThunk(
         return rejectWithValue({ message: "User not authenticated" });
       }
 
-      await axios.delete(`${API_URL}/api/products/${id}`, {
+      const { data } = await axios.delete(`${API_URL}/api/products/${id}`, {
         headers: {
           Authorization: `Bearer ${userInfo.token}`,
         },
       });
 
-      return id; // Return the deleted product id
+      return { id, message: data.message }; // Return the deleted product id and success message
     } catch (error) {
       return rejectWithValue(
         error.response?.data || { message: error.message }
@@ -116,7 +116,7 @@ const productSlice = createSlice({
         state.success = true;
         // Remove the deleted product from the products array
         state.products = state.products.filter(
-          (product) => product._id !== action.payload
+          (product) => product._id !== action.payload.id
         );
       })
       .addCase(deleteProduct.rejected, (state, action) => {
