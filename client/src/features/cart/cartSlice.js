@@ -22,7 +22,7 @@ export const getCart = createAsyncThunk(
           Authorization: `Bearer ${token}`,
         },
       });
-      return response.data;
+      return response.data; // Ensure response structure matches backend
     } catch (error) {
       return rejectWithValue(
         error.response?.data?.message || "Failed to fetch cart"
@@ -47,7 +47,7 @@ export const addToCart = createAsyncThunk(
         { productId: id, quantity: qty },
         config
       );
-      return response.data;
+      return response.data; // Ensure response structure matches backend
     } catch (error) {
       return rejectWithValue(
         error.response?.data?.message || "Failed to add item to cart"
@@ -60,10 +60,6 @@ export const removeItem = createAsyncThunk(
   "cart/removeItem",
   async ({ userId, itemId, token }, { rejectWithValue }) => {
     try {
-      if (!token) {
-        throw new Error("No authentication token found");
-      }
-
       await axios.delete(`${API_URL}/api/carts/${userId}/items/${itemId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -71,7 +67,6 @@ export const removeItem = createAsyncThunk(
       });
       return itemId; // Return the itemId to remove it from the state
     } catch (error) {
-      console.error("Remove item error:", error);
       return rejectWithValue(
         error.response?.data?.message || "Failed to remove item"
       );
@@ -92,7 +87,7 @@ export const updateItemQuantity = createAsyncThunk(
           },
         }
       );
-      return response.data; // Return updated cart
+      return response.data; // Ensure response structure matches backend
     } catch (error) {
       return rejectWithValue(
         error.response?.data?.message || "Failed to update item quantity"
