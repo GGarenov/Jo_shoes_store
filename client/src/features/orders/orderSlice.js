@@ -97,6 +97,33 @@ export const fetchAllOrders = createAsyncThunk(
   }
 );
 
+// New async thunk to update order to delivered
+export const deliverOrder = createAsyncThunk(
+  "orders/deliverOrder",
+  async (orderId, { getState, rejectWithValue }) => {
+    try {
+      const {
+        user: { userInfo },
+      } = getState();
+
+      const config = {
+        headers: {
+          Authorization: `Bearer ${userInfo.token}`,
+        },
+      };
+
+      const { data } = await axios.put(
+        `/api/orders/${orderId}/deliver`,
+        {},
+        config
+      );
+      return data;
+    } catch (error) {
+      return rejectWithValue(error.response.data);
+    }
+  }
+);
+
 // Initial state
 const initialState = {
   orders: [],
@@ -110,6 +137,10 @@ const initialState = {
   // New state for admin order list
   loadingAllOrders: false,
   errorAllOrders: null,
+  // New state for delivering orders
+  loadingDeliver: false,
+  successDeliver: false,
+  errorDeliver: null,
 };
 
 // Create the slice
@@ -188,6 +219,22 @@ const orderSlice = createSlice({
         state.loadingAllOrders = false;
         state.errorAllOrders =
           action.payload?.message || "Failed to fetch orders";
+      })
+
+      // deliverOrder cases
+      .addCase(deliverOrder.pending, (state) => {
+        state.loadingDeliver = true;
+        state.errorDeliver = null;
+      })
+      .addCase(deliverOrder.fulfilled, (state, action) => {
+        state.loadingDeliver = false;
+        state.successDeliver = true;
+        state.orderDetails = action.payload;
+      })
+      .addCase(deliverOrder.rejected, (state, action) => {
+        state.loadingDeliver = false;
+        state.errorDeliver =
+          action.payload?.message || "Failed to deliver order";
       });
   },
 });
