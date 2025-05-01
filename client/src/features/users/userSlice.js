@@ -71,6 +71,54 @@ export const logout = createAsyncThunk(
   }
 );
 
+export const fetchUserProfile = createAsyncThunk(
+  "user/fetchProfile",
+  async (_, { getState, rejectWithValue }) => {
+    try {
+      const { userInfo } = getState().user;
+      const config = {
+        headers: {
+          Authorization: `Bearer ${userInfo.token}`,
+        },
+      };
+
+      const { data } = await axios.get(
+        "http://localhost:5000/api/users/profile",
+        config
+      );
+      return data;
+    } catch (error) {
+      return rejectWithValue(error.response.data);
+    }
+  }
+);
+
+export const updateUserProfile = createAsyncThunk(
+  "user/updateProfile",
+  async (updatedData, { getState, rejectWithValue }) => {
+    try {
+      const { userInfo } = getState().user;
+      const config = {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${userInfo.token}`,
+        },
+      };
+
+      const { data } = await axios.put(
+        "http://localhost:5000/api/users/profile",
+        updatedData,
+        config
+      );
+
+      localStorage.setItem("userInfo", JSON.stringify(data));
+      return data;
+    } catch (error) {
+      return rejectWithValue(error.response.data);
+    }
+  }
+);
+
 const initialState = {
   userInfo,
   loading: false,
@@ -113,6 +161,30 @@ const userSlice = createSlice({
       })
       .addCase(logout.fulfilled, (state) => {
         state.userInfo = null;
+      })
+      .addCase(fetchUserProfile.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchUserProfile.fulfilled, (state, action) => {
+        state.loading = false;
+        state.userInfo = action.payload;
+      })
+      .addCase(fetchUserProfile.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload?.message || "Failed to fetch profile";
+      })
+      .addCase(updateUserProfile.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateUserProfile.fulfilled, (state, action) => {
+        state.loading = false;
+        state.userInfo = action.payload;
+      })
+      .addCase(updateUserProfile.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload?.message || "Failed to update profile";
       });
   },
 });
